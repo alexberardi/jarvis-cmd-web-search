@@ -15,11 +15,8 @@ from jarvis_command_sdk import (
     JarvisSecret,
 )
 
-try:
-    from services.secret_service import get_secret_value
-except ImportError:
-    def get_secret_value(key: str, scope: str) -> str | None:
-        return None
+# Secrets arrive via the SDK's execute() wrapper (see run() below). No
+# node-internal imports needed — every host can inject its own secret map.
 
 
 class SearchResult(BaseModel):
@@ -108,13 +105,13 @@ class SearchServiceFactory:
     """Factory for creating search service instances"""
 
     @staticmethod
-    def create_service() -> SearchService:
-        """Create a search service based on configuration"""
-        provider = get_secret_value("LIVE_SEARCH_PROVIDER", "integration")
+    def create_service(secrets: dict) -> SearchService:
+        """Create a search service based on the secrets the host passed in."""
+        provider = secrets.get("LIVE_SEARCH_PROVIDER")
 
         if provider == "bing":
-            api_key = get_secret_value("LIVE_SEARCH_API_KEY", "integration")
-            region = get_secret_value("LIVE_SEARCH_REGION", "integration")
+            api_key = secrets.get("LIVE_SEARCH_API_KEY")
+            region = secrets.get("LIVE_SEARCH_REGION")
 
             if not api_key:
                 raise ValueError("Bing search requires LIVE_SEARCH_API_KEY to be set")
@@ -245,7 +242,7 @@ class WebSearchCommand(IJarvisCommand):
             "For current/live info only. Not for stable facts—use answer_question.",
         ]
 
-    def run(self, request_info, **kwargs) -> CommandResponse:
+    def run(self, request_info, *, secrets, **kwargs) -> CommandResponse:
         query = kwargs.get("query")
 
         if not query:
@@ -257,8 +254,10 @@ class WebSearchCommand(IJarvisCommand):
                 }
             )
 
+        provider_for_log = secrets.get("LIVE_SEARCH_PROVIDER")
+
         try:
-            search_service = SearchServiceFactory.create_service()
+            search_service = SearchServiceFactory.create_service(secrets)
             search_results = search_service.search(query)
 
             if not search_results:
@@ -266,7 +265,7 @@ class WebSearchCommand(IJarvisCommand):
                     context_data={
                         "query": query,
                         "results_found": 0,
-                        "provider": get_secret_value("LIVE_SEARCH_PROVIDER", "integration")
+                        "provider": provider_for_log,
                     }
                 )
 
@@ -274,7 +273,7 @@ class WebSearchCommand(IJarvisCommand):
                 context_data={
                     "query": query,
                     "results_found": len(search_results),
-                    "provider": get_secret_value("LIVE_SEARCH_PROVIDER", "integration"),
+                    "provider": provider_for_log,
                     "search_results": [
                         {
                             "title": result.title,

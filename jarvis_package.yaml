@@ -1,8 +1,8 @@
 name: "search_web"
 display_name: "Web Search"
 description: "Live web search for current/real-time information via Bing or DuckDuckGo. Use for news, stocks, elections, events, and anything that changes frequently."
-version: "1.0.0"
-min_jarvis_version: "0.9.0"
+version: "1.1.0"
+min_jarvis_version: "0.1.4"
 license: "MIT"
 author:
   github: "alexberardi"
